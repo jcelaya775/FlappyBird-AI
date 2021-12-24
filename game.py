@@ -13,6 +13,8 @@ pygame.font.init()
 WIN_WIDTH = 500
 WIN_HEIGHT = 800
 
+GEN = 0
+
 BIRD_IMGS = [pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bird1.png"))), pygame.transform.scale2x(
     pygame.image.load(os.path.join("imgs", "bird2.png"))), pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bird3.png")))]
 PIPE_IMG = pygame.transform.scale2x(
@@ -85,26 +87,13 @@ class Bird:
             self.img = self.IMGS[1]
             self.img_count = self.ANIMATION_TIME * 2
 
-        blitRotateCenter(win, self.img, (self.x, self.y), self.tilt)
+        rotated_image = pygame.transform.rotate(self.img, self.tilt)
+        new_rect = rotated_image.get_rect(
+            center=self.img.get_rect(topleft=(self.x, self.y)).center)
+        win.blit(rotated_image, new_rect.topleft)
 
     def get_mask(self):
         return pygame.mask.from_surface(self.img)
-
-
-def blitRotateCenter(surf, image, topleft, angle):
-    """
-    Rotate a surface and blit it to the window
-    :param surf: the surface to blit to
-    :param image: the image surface to rotate
-    :param topLeft: the top left position of the image
-    :param angle: a float value for angle
-    :return: None
-    """
-    rotated_image = pygame.transform.rotate(image, angle)
-    new_rect = rotated_image.get_rect(
-        center=image.get_rect(topleft=topleft).center)
-
-    surf.blit(rotated_image, new_rect.topleft)
 
 
 class Base:
@@ -181,7 +170,7 @@ class Pipe:
         return False
 
 
-def draw_window(win, birds, pipes, base, score):
+def draw_window(win, birds, pipes, base, score, gen):
     win.blit(BG_IMG, (0, 0))
 
     for pipe in pipes:
@@ -190,15 +179,20 @@ def draw_window(win, birds, pipes, base, score):
     text = STAT_FONT.render("Score: " + str(score), 1, (255, 255, 255))
     win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
 
+    text = STAT_FONT.render("Gen: " + str(GEN), 1, (255, 255, 255))
+    win.blit(text, (10, 10))
+
     base.draw(win)
 
     for bird in birds:
-        bird.draw(bird)
+        bird.draw(win)
 
     pygame.display.update()
 
 
 def main(genomes, config):
+    global GEN
+    GEN += 1
     nets = []
     ge = []
     birds = []
@@ -219,7 +213,7 @@ def main(genomes, config):
 
     run = True
     while run:
-        clock.tick(30)
+        clock.tick(10000)
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 bird.jump()
@@ -283,7 +277,7 @@ def main(genomes, config):
                 ge.pop(x)
 
         base.move()
-        draw_window(win, birds, pipes, base, score)
+        draw_window(win, birds, pipes, base, score, GEN)
 
 
 def run(config_path):
@@ -296,7 +290,7 @@ def run(config_path):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
 
-    winner = p.run(main, 50)
+    winner = p.run(main, 50)  # get winner from at most 50 generations
 
 
 if __name__ == "__main__":
