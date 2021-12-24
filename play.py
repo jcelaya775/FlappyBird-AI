@@ -1,5 +1,5 @@
 '''
-AI Version of Flappy Bird
+Playable Version of Flappy Bird
 '''
 import pygame
 import neat
@@ -85,26 +85,13 @@ class Bird:
             self.img = self.IMGS[1]
             self.img_count = self.ANIMATION_TIME * 2
 
-        blitRotateCenter(win, self.img, (self.x, self.y), self.tilt)
+        rotated_image = pygame.transform.rotate(self.img, self.tilt)
+        new_rect = rotated_image.get_rect(
+            center=self.img.get_rect(topleft=(self.x, self.y)).center)
+        win.blit(rotated_image, new_rect.topleft)
 
     def get_mask(self):
         return pygame.mask.from_surface(self.img)
-
-
-def blitRotateCenter(surf, image, topleft, angle):
-    """
-    Rotate a surface and blit it to the window
-    :param surf: the surface to blit to
-    :param image: the image surface to rotate
-    :param topLeft: the top left position of the image
-    :param angle: a float value for angle
-    :return: None
-    """
-    rotated_image = pygame.transform.rotate(image, angle)
-    new_rect = rotated_image.get_rect(
-        center=image.get_rect(topleft=topleft).center)
-
-    surf.blit(rotated_image, new_rect.topleft)
 
 
 class Base:
@@ -181,7 +168,7 @@ class Pipe:
         return False
 
 
-def draw_window(win, birds, pipes, base, score):
+def draw_window(win, bird, pipes, base, score):
     win.blit(BG_IMG, (0, 0))
 
     for pipe in pipes:
@@ -192,24 +179,12 @@ def draw_window(win, birds, pipes, base, score):
 
     base.draw(win)
 
-    for bird in birds:
-        bird.draw(bird)
-
+    bird.draw(win)
     pygame.display.update()
 
 
-def main(genomes, config):
-    nets = []
-    ge = []
-    birds = []
-
-    for _, g in genomes:
-        net = neat.nn.FeedForwardNetwork.create(g, config)
-        nets.append(net)
-        birds.append(Bird(230, 350))
-        g.fitness = 0
-        ge.append(g)
-
+def main():
+    bird = Bird(230, 350)
     base = Base(730)
     pipes = [Pipe(600)]
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
@@ -225,81 +200,37 @@ def main(genomes, config):
                 bird.jump()
             if event.type == pygame.QUIT:
                 run = False
-                pygame.quit()
-                quit()
 
+        bird.move()
         add_pipe = False
         rem = []
         for pipe in pipes:
-            for x, bird in enumerate(birds):
-                if pipe.collide(bird):
-                    ge[x].fitness -= 1
-                    birds.pop(x)
-                    nets.pop(x)
-                    ge.pop(x)
-
-                if not pipe.passed and pipe.x < bird.x:
-                    pipe.passed = True
-                    add_pipe = True
+            if pipe.collide(bird):
+                run = False
+            elif bird.y + bird.img.get_height() >= 730 or bird.y < 0:
+                run = False
 
             if pipe.x + pipe.PIPE_TOP.get_width() < 0:
                 rem.append(pipe)
 
+            if not pipe.passed and pipe.x < bird.x:
+                pipe.passed = True
+                add_pipe = True
+
             pipe.move()
-
-        # if there are multiple pipes, set which pipe on screen the birds should be looking at
-        pipe_ind = 0
-        if len(birds) > 0:
-            if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():
-                pipe_ind = 1
-        else:
-            run = False
-            break
-
-        for x, bird in enumerate(birds):
-            bird.move()
-            ge[x].fitness += 0.1  # constantly encourage bird to stay alive
-
-            # get output from nn with given inputs (bird height, top pipe, and bottom pipe)
-            output = nets[x].activate((bird.y, abs(
-                bird.y - pipes[pipe_ind].top), abs(bird.y - pipes[pipe_ind].bottom)))
-
-            if output[0] > 0.5:
-                bird.jump()
 
         if add_pipe:
             score += 1
-            for g in ge:
-                g.fitness += 5
             pipes.append(Pipe(600))
 
         for r in rem:
             pipes.remove(r)
 
-        for x, bird in enumerate(birds):
-            if bird.y + bird.img.get_height() >= 730 or bird.y < 0:  # if birds hits ground
-                birds.pop(x)
-                nets.pop(x)
-                ge.pop(x)
+        if bird.y + bird.img.get_height() >= 730:
+            pass
 
         base.move()
-        draw_window(win, birds, pipes, base, score)
+        draw_window(win, bird, pipes, base, score)
 
 
-def run(config_path):
-    # configure neat with default categories specified in neat config file
-    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                                neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
-
-    p = neat.Population(config)  # population
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
-    p.add_reporter(stats)
-
-    winner = p.run(main, 50)
-
-
-if __name__ == "__main__":
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, "config-feedforward.txt")
-    run(config_path)
+main()
