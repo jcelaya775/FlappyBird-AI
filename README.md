@@ -1,1 +1,1 @@
-![thumbnail](http://thumbnail.png)
+![thumbnail](thumbnail.png)
